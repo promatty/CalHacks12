@@ -1,5 +1,6 @@
 import { OrbitControls, Grid } from "@react-three/drei"
 import { AnimatedBox } from "./AnimatedBox"
+import { AnimatedSphere } from "./AnimatedSphere"
 
 export function Scene() {
   const initialPositions: [number, number, number][] = [
@@ -32,7 +33,7 @@ export function Scene() {
         fadeDistance={50}
       />
       {initialPositions.map((position, index) => (
-        <AnimatedBox key={index} initialPosition={position} />
+        <AnimatedSphere key={index} initialPosition={position} />
       ))}
     </>
   )
