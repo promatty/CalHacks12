@@ -40,7 +40,7 @@ export function AnimatedBox({
     return () => clearInterval(interval);
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame(() => {
     if (meshRef.current) {
       currentPosition.current.lerp(targetPosition, 0.1);
       meshRef.current.position.copy(currentPosition.current);

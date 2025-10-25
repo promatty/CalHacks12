@@ -5,7 +5,7 @@ import type * as THREE from "three";
 export function SpinningLogo() {
   const groupRef = useRef<THREE.Group>(null);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     if (groupRef.current) {
       groupRef.current.rotation.y += delta * 0.5;
     }
