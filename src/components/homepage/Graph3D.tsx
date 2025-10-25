@@ -18,6 +18,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const nodesRef = useRef<NodeData[]>(initialNodes);
   const nodeMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const edgeLinesRef = useRef<Map<string, THREE.Line>>(new Map());
+  const nodeLabelsRef = useRef<Map<string, THREE.Sprite>>(new Map());
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const mouse3DRef = useRef<THREE.Vector3>(new THREE.Vector3());
@@ -35,6 +36,10 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     if (!containerRef.current) return;
 
     const container = containerRef.current;
+    const nodeMeshes = nodeMeshesRef.current;
+    const edgeLines = edgeLinesRef.current;
+    const nodeLabels = nodeLabelsRef.current;
+    
     const scene = new THREE.Scene();
     scene.background = null;
     sceneRef.current = scene;
@@ -108,6 +113,36 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     scene.add(gridHelperYZ);
     yzPlaneRef.current = gridHelperYZ;
 
+    const createTextSprite = (text: string) => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) return null;
+
+      canvas.width = 512;
+      canvas.height = 128;
+
+      context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      context.font = 'bold 48px Arial';
+      context.fillStyle = 'white';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMaterial = new THREE.SpriteMaterial({ 
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(4, 1, 1);
+
+      return sprite;
+    };
+
     const maxEdits = Math.max(...nodesRef.current.map(n => n.editCount));
 
     nodesRef.current.forEach(node => {
@@ -171,7 +206,14 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
-      nodeMeshesRef.current.set(node.id, mesh);
+      nodeMeshes.set(node.id, mesh);
+
+      const label = createTextSprite(node.name);
+      if (label) {
+        label.position.set(node.position.x, node.position.y + 1.5, node.position.z);
+        scene.add(label);
+        nodeLabels.set(node.id, label);
+      }
     });
 
     edges.forEach(edge => {
@@ -191,7 +233,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         });
         const line = new THREE.Line(geometry, material);
         scene.add(line);
-        edgeLinesRef.current.set(edge.id, line);
+        edgeLines.set(edge.id, line);
       }
     });
 
@@ -276,11 +318,16 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
             visualZ += offsetZ;
           }
           
-          mesh.position.set(visualX, visualY, visualZ);
-          mesh.rotation.x += 0.005;
-          mesh.rotation.y += 0.005;
+        mesh.position.set(visualX, visualY, visualZ);
+        mesh.rotation.x += 0.005;
+        mesh.rotation.y += 0.005;
+
+        const label = nodeLabelsRef.current.get(node.id);
+        if (label) {
+          label.position.set(visualX, visualY + 1.5, visualZ);
         }
-      });
+      }
+    });
 
       edges.forEach(edge => {
         const line = edgeLinesRef.current.get(edge.id);
@@ -345,6 +392,24 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('click', handleClick);
+      
+      nodeMeshes.forEach(mesh => {
+        scene.remove(mesh);
+      });
+      nodeMeshes.clear();
+      
+      edgeLines.forEach(line => {
+        scene.remove(line);
+      });
+      edgeLines.clear();
+      
+      nodeLabels.forEach(label => {
+        scene.remove(label);
+        label.material.map?.dispose();
+        label.material.dispose();
+      });
+      nodeLabels.clear();
+      
       if (renderer && container) {
         container.removeChild(renderer.domElement);
       }
