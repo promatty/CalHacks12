@@ -10,7 +10,11 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str | List[str] = ""
     LAVA_FORWARD_TOKEN: str = ""
     LAVA_BASE_URL: str = ""
-    CHROMA_KEY: str = ""
+    
+    # chroma cloud credentials
+    API_KEY: str = ""
+    TENANT: str = ""
+    DATABASE_NAME: str = ""
 
     @field_validator("ALLOWED_ORIGINS")
     @classmethod
@@ -22,7 +26,7 @@ class Settings(BaseSettings):
             return v.split(",") if v else []
 
         return []
-
+        
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

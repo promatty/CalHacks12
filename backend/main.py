@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 # uncomment when we eventually edit this routergg
-# app.include_router(chroma.router, prefix=settings.API_PREFIX)
+app.include_router(chroma.router, prefix=settings.API_PREFIX)
 app.include_router(lava.router, prefix=settings.API_PREFIX)
 
 if __name__ == "__main__":
