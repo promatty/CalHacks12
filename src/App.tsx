@@ -4,14 +4,16 @@ import LandingPage from "./pages/Landing/LandingPage";
 import "./App.css";
 
 function App() {
-	return (
-		<BrowserRouter>
-			<Routes>
-				<Route path="/" element={<LandingPage />} />
-				<Route path="/home" element={<HomePage />} />
-			</Routes>
-		</BrowserRouter>
-	);
+  return (
+    <BrowserRouter>
+      <div className="w-full h-screen">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<HomePage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
 }
 
 export default App;
