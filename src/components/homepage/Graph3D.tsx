@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { EdgeData, NodeData } from './types';
-import { applyForces, getConnectedNodeIds, getHeatMapColor } from './utils';
+import { applyForces, getConnectedNodeIds, getHeatMapColor, applyMouseInfluence } from './utils';
 
 interface Graph3DProps {
   nodes: NodeData[];
@@ -112,10 +112,18 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     });
 
     const handleMouseMove = (event: MouseEvent) => {
-      if (!container) return;
+      if (!container || !camera) return;
       const rect = container.getBoundingClientRect();
       mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      const vector = new THREE.Vector3(mouseRef.current.x, mouseRef.current.y, 0.5);
+      vector.unproject(camera);
+      const dir = vector.sub(camera.position).normalize();
+      const distance = -camera.position.z / dir.z;
+      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+      
+      mouse3DRef.current.copy(pos);
     };
 
     const handleResize = () => {
@@ -145,6 +153,17 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       }
 
       nodesRef.current = applyForces(nodesRef.current, edges, deltaTime);
+
+      nodesRef.current = applyMouseInfluence(
+        nodesRef.current,
+        {
+          x: mouse3DRef.current.x,
+          y: mouse3DRef.current.y,
+          z: mouse3DRef.current.z,
+        },
+        6,
+        0.3
+      );
 
       nodesRef.current.forEach(node => {
         const mesh = nodeMeshesRef.current.get(node.id);
