@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { EdgeData, NodeData } from './types';
-import { applyForces, getConnectedNodeIds, getHeatMapColor, applyMouseInfluence } from './utils';
+import { applyForces, getConnectedNodeIds, getHeatMapColor } from './utils';
 
 interface Graph3DProps {
   nodes: NodeData[];
@@ -154,21 +154,33 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
 
       nodesRef.current = applyForces(nodesRef.current, edges, deltaTime);
 
-      nodesRef.current = applyMouseInfluence(
-        nodesRef.current,
-        {
-          x: mouse3DRef.current.x,
-          y: mouse3DRef.current.y,
-          z: mouse3DRef.current.z,
-        },
-        6,
-        0.3
-      );
-
       nodesRef.current.forEach(node => {
         const mesh = nodeMeshesRef.current.get(node.id);
         if (mesh) {
-          mesh.position.set(node.position.x, node.position.y, node.position.z);
+          const dx = node.position.x - mouse3DRef.current.x;
+          const dy = node.position.y - mouse3DRef.current.y;
+          const dz = node.position.z - mouse3DRef.current.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          
+          const influenceRadius = 8;
+          const influenceStrength = 1.2;
+          
+          let visualX = node.position.x;
+          let visualY = node.position.y;
+          let visualZ = node.position.z;
+          
+          if (distance < influenceRadius && distance > 0.1) {
+            const influence = (1 - distance / influenceRadius) * influenceStrength;
+            const offsetX = (dx / distance) * influence;
+            const offsetY = (dy / distance) * influence;
+            const offsetZ = (dz / distance) * influence;
+            
+            visualX += offsetX;
+            visualY += offsetY;
+            visualZ += offsetZ;
+          }
+          
+          mesh.position.set(visualX, visualY, visualZ);
           mesh.rotation.x += 0.005;
           mesh.rotation.y += 0.005;
         }
@@ -180,9 +192,35 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         const targetNode = nodesRef.current.find(n => n.id === edge.target);
         
         if (line && sourceNode && targetNode) {
+          const calculateVisualPosition = (node: NodeData) => {
+            const dx = node.position.x - mouse3DRef.current.x;
+            const dy = node.position.y - mouse3DRef.current.y;
+            const dz = node.position.z - mouse3DRef.current.z;
+            const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            const influenceRadius = 8;
+            const influenceStrength = 1.2;
+            
+            let x = node.position.x;
+            let y = node.position.y;
+            let z = node.position.z;
+            
+            if (distance < influenceRadius && distance > 0.1) {
+              const influence = (1 - distance / influenceRadius) * influenceStrength;
+              x += (dx / distance) * influence;
+              y += (dy / distance) * influence;
+              z += (dz / distance) * influence;
+            }
+            
+            return { x, y, z };
+          };
+          
+          const sourcePos = calculateVisualPosition(sourceNode);
+          const targetPos = calculateVisualPosition(targetNode);
+          
           const positions = new Float32Array([
-            sourceNode.position.x, sourceNode.position.y, sourceNode.position.z,
-            targetNode.position.x, targetNode.position.y, targetNode.position.z,
+            sourcePos.x, sourcePos.y, sourcePos.z,
+            targetPos.x, targetPos.y, targetPos.z,
           ]);
           line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         }

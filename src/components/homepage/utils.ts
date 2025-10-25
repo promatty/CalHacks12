@@ -110,13 +110,13 @@ export const getConnectedNodeIds = (nodeId: string, edges: EdgeData[]): Set<stri
 export const applyMouseInfluence = (
   nodes: NodeData[],
   mousePosition: { x: number; y: number; z: number },
-  influenceRadius: number = 8,
-  influenceStrength: number = 0.5
+  influenceRadius: number = 1,
+  influenceStrength: number = 0.01
 ) => {
   return nodes.map(node => {
-    const dx = mousePosition.x - node.position.x;
-    const dy = mousePosition.y - node.position.y;
-    const dz = mousePosition.z - node.position.z;
+    const dx = node.position.x - mousePosition.x;
+    const dy = node.position.y - mousePosition.y;
+    const dz = node.position.z - mousePosition.z;
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
     if (distance < influenceRadius && distance > 0.1) {
