@@ -6,7 +6,7 @@ export function Hero() {
       </h1>
       <h2 className="text-xl mb-10">
         Transform any GitHub repository into a searchable, always-up-to-date
-        knowledge base using ChromaDB and AI
+        knowledge base using Chroma and AI
       </h2>
       <div className="flex flex-col items-center gap-4">
         <input
