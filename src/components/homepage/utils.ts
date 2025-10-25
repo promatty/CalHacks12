@@ -63,7 +63,7 @@ export const applyForces = (nodes: NodeData[], edges: EdgeData[], deltaTime: num
       const dx = targetNode.position.x - sourceNode.position.x;
       const dy = targetNode.position.y - sourceNode.position.y;
       const dz = targetNode.position.z - sourceNode.position.z;
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
       
       const force = (distance - 3) * attractionStrength;
       const fx = (dx / distance) * force;
