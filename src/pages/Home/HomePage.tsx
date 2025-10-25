@@ -1,8 +1,11 @@
+import { Graph3D, mockGraphData } from '../../components/homepage';
+
 function HomePage() {
   return (
-    <main>
-      <h1>Home</h1>
-    </main>
+    <div className="w-screen bg-black h-screen relative">
+      <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/50 to-black" />
+      <Graph3D nodes={mockGraphData.nodes} edges={mockGraphData.edges} />
+    </div>
   );
 }
 
