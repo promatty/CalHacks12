@@ -4,8 +4,10 @@ import * as THREE from "three";
 
 export function AnimatedSphere({
 	initialPosition,
+	color = "#ffffff",
 }: {
 	initialPosition: [number, number, number];
+	color?: string;
 }) {
 	const meshRef = useRef<THREE.Mesh>(null);
 	const [targetPosition, setTargetPosition] = useState(
@@ -50,7 +52,7 @@ export function AnimatedSphere({
 	return (
 		<mesh ref={meshRef} position={initialPosition}>
 			<sphereGeometry args={[0.5, 32, 32]} />
-			<meshStandardMaterial color="#ffffff" opacity={0.9} transparent />
+			<meshStandardMaterial color={color} opacity={0.9} transparent />
 		</mesh>
 	);
 }
