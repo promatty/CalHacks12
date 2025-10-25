@@ -8,9 +8,13 @@ export function Hero() {
         Transform any GitHub repository into a searchable, always-up-to-date
         knowledge base using ChromaDB and AI
       </h2>
-      <button className="bg-white text-black font-bold py-3 px-6 rounded-md hover:bg-gray-200 transition duration-300">
-        Analyze Repository
-      </button>
+      <div className="flex flex-col items-center gap-4">
+        <input
+          type="text"
+          placeholder="https://github.com/user/repo"
+          className="w-full max-w-md px-4 py-3 rounded-md text-white placeholder-gray-400 bg-transparent border-[0.5px] border-gray-300 focus:outline-none"
+        />
+      </div>
     </div>
   );
 }
