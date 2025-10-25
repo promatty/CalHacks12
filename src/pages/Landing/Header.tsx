@@ -13,7 +13,7 @@ export function Header() {
               <SpinningLogo />
             </Canvas>
           </div>
-          <span className="text-2xl font-bold">ProjectTitle</span>
+          <span className="text-2xl font-semibold">Contextualize</span>
         </div>
       </nav>
     </header>
