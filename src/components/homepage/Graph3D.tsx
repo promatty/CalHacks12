@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { EdgeData, NodeData } from './types';
 import { applyForces, getConnectedNodeIds, getHeatMapColor } from './utils';
 
@@ -13,6 +14,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const nodesRef = useRef<NodeData[]>(initialNodes);
   const nodeMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const edgeLinesRef = useRef<Map<string, THREE.Line>>(new Map());
@@ -20,13 +22,21 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const mouse3DRef = useRef<THREE.Vector3>(new THREE.Vector3());
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showXZPlane, setShowXZPlane] = useState<boolean>(true);
+  const [showXYPlane, setShowXYPlane] = useState<boolean>(true);
+  const [showYZPlane, setShowYZPlane] = useState<boolean>(true);
+  const [showGridControls, setShowGridControls] = useState<boolean>(false);
+  const xzPlaneRef = useRef<THREE.Object3D | null>(null);
+  const xyPlaneRef = useRef<THREE.Object3D | null>(null);
+  const yzPlaneRef = useRef<THREE.Object3D | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const container = containerRef.current;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
+    scene.background = null;
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -35,7 +45,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       0.1,
       1000
     );
-    camera.position.set(0, 0, 20);
+    camera.position.set(0, 10, 25);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -47,6 +57,21 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 15;
+    controls.maxDistance = 40;
+    controls.enablePan = true;
+    controls.maxPolarAngle = Math.PI * 0.75;
+    controls.minPolarAngle = Math.PI * 0.1;
+    controls.maxAzimuthAngle = Math.PI * 0.5;
+    controls.minAzimuthAngle = -Math.PI * 0.5;
+    controls.target.set(0, 0, 0);
+    controls.enableZoom = true;
+    controls.autoRotate = false;
+    controlsRef.current = controls;
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
@@ -63,27 +88,86 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
 
+    const gridSize = 40;
+    const gridDivisions = 20;
+    
+    const gridHelperXZ = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x222222);
+    gridHelperXZ.position.y = 0;
+    scene.add(gridHelperXZ);
+    xzPlaneRef.current = gridHelperXZ;
+
+    const gridHelperXY = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x222222);
+    gridHelperXY.rotation.x = Math.PI / 2;
+    gridHelperXY.position.z = 0;
+    scene.add(gridHelperXY);
+    xyPlaneRef.current = gridHelperXY;
+
+    const gridHelperYZ = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0x222222);
+    gridHelperYZ.rotation.z = Math.PI / 2;
+    gridHelperYZ.position.x = 0;
+    scene.add(gridHelperYZ);
+    yzPlaneRef.current = gridHelperYZ;
+
     const maxEdits = Math.max(...nodesRef.current.map(n => n.editCount));
 
     nodesRef.current.forEach(node => {
-      const geometry = new THREE.IcosahedronGeometry(0.6, 1);
+      const geometry = new THREE.SphereGeometry(0.6, 64, 64);
       const color = getHeatMapColor(node.editCount, maxEdits);
-      const material = new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(color),
-        emissive: new THREE.Color(color),
-        emissiveIntensity: 0.4,
-        metalness: 0.3,
-        roughness: 0.2,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 0.8,
-        transmission: 0.1,
+      const baseColor = new THREE.Color(color);
+      
+      const vertexShader = `
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `;
+      
+      const fragmentShader = `
+        uniform vec3 color1;
+        uniform vec3 color2;
+        uniform vec3 color3;
+        uniform float time;
+        
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          vec3 light = normalize(vec3(0.5, 1.0, 0.5));
+          float dProd = max(0.0, dot(vNormal, light));
+          
+          float gradientMix = (vPosition.y + 1.0) * 0.5;
+          vec3 baseColor = mix(color1, color2, gradientMix);
+          vec3 finalColor = mix(baseColor, color3, vPosition.z * 0.3 + 0.5);
+          
+          vec3 diffuse = finalColor * (0.5 + dProd * 0.5);
+          vec3 emissive = finalColor * 0.3;
+          
+          gl_FragColor = vec4(diffuse + emissive, 0.95);
+        }
+      `;
+      
+      const darkerColor = baseColor.clone().multiplyScalar(0.6);
+      const lighterColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.3);
+      
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          color1: { value: darkerColor },
+          color2: { value: baseColor },
+          color3: { value: lighterColor },
+          time: { value: 0 }
+        },
+        vertexShader,
+        fragmentShader,
         transparent: true,
-        opacity: 0.95,
       });
+      
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(node.position.x, node.position.y, node.position.z);
-      mesh.userData = { nodeId: node.id };
+      mesh.userData = { nodeId: node.id, baseColor: color };
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       scene.add(mesh);
@@ -101,9 +185,10 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         ];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({
-          color: 0x444444,
-          opacity: 0.6,
-          transparent: true,
+          color: 0xffffff,
+          linewidth: 5,
+          opacity: 1,
+          transparent: false,
         });
         const line = new THREE.Line(geometry, material);
         scene.add(line);
@@ -133,8 +218,26 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       renderer.setSize(container.clientWidth, container.clientHeight);
     };
 
+    const handleClick = (event: MouseEvent) => {
+      if (!container || !camera) return;
+      const rect = container.getBoundingClientRect();
+      const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      
+      raycasterRef.current.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+      const meshes = Array.from(nodeMeshesRef.current.values());
+      const intersects = raycasterRef.current.intersectObjects(meshes);
+      
+      if (intersects.length > 0) {
+        const clickedMesh = intersects[0].object as THREE.Mesh;
+        const nodeId = clickedMesh.userData.nodeId;
+        setSelectedNodeId(nodeId);
+      }
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('resize', handleResize);
+    window.addEventListener('click', handleClick);
 
     let lastTime = Date.now();
     const animate = () => {
@@ -144,13 +247,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
       lastTime = currentTime;
 
-      if (camera) {
-        const targetX = mouseRef.current.x * 2;
-        const targetY = mouseRef.current.y * 2;
-        camera.position.x += (targetX - camera.position.x) * 0.02;
-        camera.position.y += (targetY - camera.position.y) * 0.02;
-        camera.lookAt(0, 0, 0);
-      }
+      controls.update();
 
       nodesRef.current = applyForces(nodesRef.current, edges, deltaTime);
 
@@ -248,28 +345,53 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('click', handleClick);
       if (renderer && container) {
         container.removeChild(renderer.domElement);
       }
       renderer?.dispose();
+      controls?.dispose();
     };
   }, [edges, initialNodes]);
+
+  useEffect(() => {
+    if (xzPlaneRef.current) {
+      xzPlaneRef.current.visible = showXZPlane;
+    }
+  }, [showXZPlane]);
+
+  useEffect(() => {
+    if (xyPlaneRef.current) {
+      xyPlaneRef.current.visible = showXYPlane;
+    }
+  }, [showXYPlane]);
+
+  useEffect(() => {
+    if (yzPlaneRef.current) {
+      yzPlaneRef.current.visible = showYZPlane;
+    }
+  }, [showYZPlane]);
 
   useEffect(() => {
     if (!hoveredNodeId) {
       nodeMeshesRef.current.forEach((mesh, nodeId) => {
         const node = nodesRef.current.find(n => n.id === nodeId);
-        if (node) {
+        if (node && mesh.material instanceof THREE.ShaderMaterial) {
           const maxEdits = Math.max(...nodesRef.current.map(n => n.editCount));
           const color = getHeatMapColor(node.editCount, maxEdits);
-          (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3;
-          (mesh.material as THREE.MeshStandardMaterial).color.set(new THREE.Color(color));
+          const baseColor = new THREE.Color(color);
+          const darkerColor = baseColor.clone().multiplyScalar(0.6);
+          const lighterColor = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.3);
+          
+          mesh.material.uniforms.color1.value = darkerColor;
+          mesh.material.uniforms.color2.value = baseColor;
+          mesh.material.uniforms.color3.value = lighterColor;
         }
       });
 
       edgeLinesRef.current.forEach(line => {
-        (line.material as THREE.LineBasicMaterial).opacity = 0.6;
-        (line.material as THREE.LineBasicMaterial).color.set(0x444444);
+        (line.material as THREE.LineBasicMaterial).opacity = 1;
+        (line.material as THREE.LineBasicMaterial).color.set(0xffffff);
       });
       return;
     }
@@ -277,16 +399,24 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     const connectedIds = getConnectedNodeIds(hoveredNodeId, edges);
 
     nodeMeshesRef.current.forEach((mesh, nodeId) => {
-      if (nodeId === hoveredNodeId || connectedIds.has(nodeId)) {
-        (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.8;
-        (mesh.material as THREE.MeshStandardMaterial).color.set(0xffffff);
-      } else {
-        const node = nodesRef.current.find(n => n.id === nodeId);
-        if (node) {
-          const maxEdits = Math.max(...nodesRef.current.map(n => n.editCount));
-          const color = getHeatMapColor(node.editCount, maxEdits);
-          (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.1;
-          (mesh.material as THREE.MeshStandardMaterial).color.set(new THREE.Color(color));
+      if (mesh.material instanceof THREE.ShaderMaterial) {
+        if (nodeId === hoveredNodeId || connectedIds.has(nodeId)) {
+          const highlightColor = new THREE.Color(0xffffff);
+          mesh.material.uniforms.color1.value = highlightColor.clone().multiplyScalar(0.7);
+          mesh.material.uniforms.color2.value = highlightColor;
+          mesh.material.uniforms.color3.value = highlightColor.clone().multiplyScalar(1.2);
+        } else {
+          const node = nodesRef.current.find(n => n.id === nodeId);
+          if (node) {
+            const maxEdits = Math.max(...nodesRef.current.map(n => n.editCount));
+            const color = getHeatMapColor(node.editCount, maxEdits);
+            const baseColor = new THREE.Color(color);
+            const dimmedColor = baseColor.clone().multiplyScalar(0.3);
+            
+            mesh.material.uniforms.color1.value = dimmedColor;
+            mesh.material.uniforms.color2.value = dimmedColor.clone().multiplyScalar(1.2);
+            mesh.material.uniforms.color3.value = dimmedColor.clone().multiplyScalar(1.4);
+          }
         }
       }
     });
@@ -303,9 +433,13 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     });
   }, [hoveredNodeId, edges]);
 
+  const maxEdits = Math.max(...initialNodes.map(n => n.editCount));
+  const minEdits = Math.min(...initialNodes.map(n => n.editCount));
+
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      
       {hoveredNodeId && (
         <div className="absolute top-4 left-4 bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
           <p className="text-sm font-semibold">
@@ -314,6 +448,167 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
           <p className="text-xs text-gray-400">
             Edits: {nodesRef.current.find(n => n.id === hoveredNodeId)?.editCount}
           </p>
+        </div>
+      )}
+
+      <div className="absolute bottom-6 left-6 bg-black/80 backdrop-blur-sm rounded-lg p-3">
+        <button
+          onClick={() => setShowGridControls(!showGridControls)}
+          className="text-white text-sm font-medium hover:text-gray-300 transition-colors flex items-center gap-2"
+        >
+          <span>Grid Planes (View Controls)</span>
+          <svg 
+            className={`w-4 h-4 transition-transform ${showGridControls ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showGridControls && (
+          <div className="mt-3 space-y-2 border-t border-gray-700 pt-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-300">XZ Plane</span>
+              <button
+                onClick={() => setShowXZPlane(!showXZPlane)}
+                className={`w-10 h-5 rounded-full transition-colors ${showXZPlane ? 'bg-blue-600' : 'bg-gray-600'} relative`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showXZPlane ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-300">XY Plane</span>
+              <button
+                onClick={() => setShowXYPlane(!showXYPlane)}
+                className={`w-10 h-5 rounded-full transition-colors ${showXYPlane ? 'bg-purple-600' : 'bg-gray-600'} relative`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showXYPlane ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-300">YZ Plane</span>
+              <button
+                onClick={() => setShowYZPlane(!showYZPlane)}
+                className={`w-10 h-5 rounded-full transition-colors ${showYZPlane ? 'bg-green-600' : 'bg-gray-600'} relative`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showYZPlane ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="absolute top-6 left-6 bg-black/80 backdrop-blur-sm rounded-lg p-4 min-w-[200px]">
+        <h3 className="text-white text-sm font-semibold mb-3">Edit Activity</h3>
+        
+        <div className="relative h-6 rounded-full overflow-hidden mb-2">
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to right, 
+                ${getHeatMapColor(minEdits, maxEdits)}, 
+                ${getHeatMapColor(Math.floor(maxEdits * 0.33), maxEdits)}, 
+                ${getHeatMapColor(Math.floor(maxEdits * 0.66), maxEdits)}, 
+                ${getHeatMapColor(maxEdits, maxEdits)})`
+            }}
+          />
+        </div>
+        
+        <div className="flex justify-between text-xs text-gray-300">
+          <span>{minEdits} edits</span>
+          <span>{maxEdits} edits</span>
+        </div>
+        
+        <div className="mt-3 pt-3 border-t border-gray-700">
+          <div className="flex items-center justify-between text-xs text-gray-400">
+            <span>Total Files:</span>
+            <span className="text-white font-semibold">{initialNodes.length}</span>
+          </div>
+        </div>
+      </div>
+
+      {selectedNodeId && (
+        <div className="absolute top-0 right-0 h-full w-96 bg-black/90 backdrop-blur-md border-l border-gray-800 flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-800">
+            <div className="flex-1">
+              <h2 className="text-white font-semibold text-lg">
+                {nodesRef.current.find(n => n.id === selectedNodeId)?.name}
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {nodesRef.current.find(n => n.id === selectedNodeId)?.editCount} edits
+              </p>
+            </div>
+            <button
+              onClick={() => setSelectedNodeId(null)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div>
+              <h3 className="text-white font-semibold text-sm mb-3">Commit History</h3>
+              <div className="space-y-3">
+                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></div>
+                    <div className="flex-1">
+                      <p className="text-white text-sm font-medium">Added feature X</p>
+                      <p className="text-gray-400 text-xs mt-1">2 hours ago • John Doe</p>
+                      <p className="text-gray-500 text-xs mt-2">commit: abc123f</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
+                    <div className="flex-1">
+                      <p className="text-white text-sm font-medium">Fixed bug in validation</p>
+                      <p className="text-gray-400 text-xs mt-1">1 day ago • Jane Smith</p>
+                      <p className="text-gray-500 text-xs mt-2">commit: def456a</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5"></div>
+                    <div className="flex-1">
+                      <p className="text-white text-sm font-medium">Refactored components</p>
+                      <p className="text-gray-400 text-xs mt-1">3 days ago • Mike Johnson</p>
+                      <p className="text-gray-500 text-xs mt-2">commit: ghi789b</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-gray-800">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ask about this file..."
+                className="flex-1 bg-gray-900 text-white text-sm rounded-lg px-4 py-2 border border-gray-700 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-gray-500 text-xs mt-2">
+              Ask questions about commits, changes, or functionality
+            </p>
+          </div>
         </div>
       )}
     </div>
