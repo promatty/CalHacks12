@@ -1,5 +1,6 @@
-import { OrbitControls, Grid } from "@react-three/drei"
-import { AnimatedBox } from "./AnimatedBox"
+import { OrbitControls, Grid } from "@react-three/drei";
+//import { AnimatedBox } from "./AnimatedBox";
+import { AnimatedSphere } from "./AnimatedSphere";
 
 export function Scene() {
   const initialPositions: [number, number, number][] = [
@@ -13,7 +14,22 @@ export function Scene() {
     [-12, 0.5, 0],
     [12, 0.5, 0],
     [0, 0.5, 12],
-  ]
+  ];
+
+  // interpolate between white (#ffffff) and blue (#2596be)
+  const interpolateColor = (index: number, total: number): string => {
+    const t = index / (total - 1);
+    const startColor = { r: 255, g: 255, b: 255 }; // #ffffff
+    const endColor = { r: 37, g: 150, b: 190 }; // #2596be
+
+    const r = Math.round(startColor.r + (endColor.r - startColor.r) * t);
+    const g = Math.round(startColor.g + (endColor.g - startColor.g) * t);
+    const b = Math.round(startColor.b + (endColor.b - startColor.b) * t);
+
+    return `#${r.toString(16).padStart(2, "0")}${g
+      .toString(16)
+      .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  };
 
   return (
     <>
@@ -28,12 +44,16 @@ export function Scene() {
         cellThickness={0.5}
         sectionSize={3}
         sectionThickness={1}
-        sectionColor={[0.5, 0.5, 0.5]}
+        sectionColor="#808080"
         fadeDistance={50}
       />
       {initialPositions.map((position, index) => (
-        <AnimatedBox key={index} initialPosition={position} />
+        <AnimatedSphere
+          key={index}
+          initialPosition={position}
+          color={interpolateColor(index, initialPositions.length)}
+        />
       ))}
     </>
-  )
+  );
 }
