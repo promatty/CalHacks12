@@ -4,10 +4,12 @@
   background: radial-gradient(circle, var(--tw-gradient-stops));
 }
 
+@import "tailwindcss";
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Geist", system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 300;
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
