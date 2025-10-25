@@ -1,6 +1,10 @@
 import type { EdgeData, NodeData } from './types';
 
 export const getHeatMapColor = (editCount: number, maxEdits: number): string => {
+  if (maxEdits <= 0) {
+    // Return a default color if maxEdits is zero or negative
+    return 'rgb(200,200,200)';
+  }
   const intensity = Math.min(editCount / maxEdits, 1);
   
   if (intensity < 0.33) {
