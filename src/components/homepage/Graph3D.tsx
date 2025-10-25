@@ -186,7 +186,6 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({
           color: 0xffffff,
-          linewidth: 5,
           opacity: 1,
           transparent: false,
         });
