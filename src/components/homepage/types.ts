@@ -4,7 +4,7 @@ export interface NodeData {
   id: string;
   name: string;
   editCount: number;
-  fileLength: number;
+  lengthOfFile: number;
   velocity?: {
     x: number;
     y: number;

@@ -2,16 +2,16 @@ import type { GraphData } from "./types";
 
 export const mockGraphData: GraphData = {
   nodes: [
-    { id: "1", name: "App.tsx", editCount: 45, fileLength: 200 },
-    { id: "2", name: "HomePage.tsx", editCount: 323, fileLength: 150 },
-    { id: "3", name: "LandingPage.tsx", editCount: 28, fileLength: 100 },
-    { id: "4", name: "index.tsx", editCount: 156, fileLength: 250 },
-    { id: "5", name: "utils.ts", editCount: 52, fileLength: 75 },
-    { id: "6", name: "api.ts", editCount: 38, fileLength: 90 },
-    { id: "7", name: "types.ts", editCount: 20, fileLength: 60 },
-    { id: "8", name: "Header.tsx", editCount: 12, fileLength: 40 },
-    { id: "9", name: "Footer.tsx", editCount: 8, fileLength: 30 },
-    { id: "10", name: "config.ts", editCount: 25, fileLength: 50 },
+    { id: "1", name: "App.tsx", editCount: 45, lengthOfFile: 200 },
+    { id: "2", name: "HomePage.tsx", editCount: 323, lengthOfFile: 150 },
+    { id: "3", name: "LandingPage.tsx", editCount: 28, lengthOfFile: 100 },
+    { id: "4", name: "index.tsx", editCount: 156, lengthOfFile: 250 },
+    { id: "5", name: "utils.ts", editCount: 52, lengthOfFile: 75 },
+    { id: "6", name: "api.ts", editCount: 38, lengthOfFile: 90 },
+    { id: "7", name: "types.ts", editCount: 20, lengthOfFile: 60 },
+    { id: "8", name: "Header.tsx", editCount: 12, lengthOfFile: 40 },
+    { id: "9", name: "Footer.tsx", editCount: 8, lengthOfFile: 30 },
+    { id: "10", name: "config.ts", editCount: 25, lengthOfFile: 50 },
   ],
   edges: [
     { id: "e1", source: "1", target: "2" },
