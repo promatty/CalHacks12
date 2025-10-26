@@ -602,7 +602,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       <div ref={containerRef} className="w-full h-full" />
 
       {hoveredNodeId && (
-        <div className="absolute top-4 left-4 bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
+        <div className="absolute top-4 left-31   bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
           <p className="text-sm font-semibold">
             {nodesRef.current.find((n) => n.id === hoveredNodeId)?.name}
           </p>
