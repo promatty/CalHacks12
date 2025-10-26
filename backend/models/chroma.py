@@ -2,5 +2,7 @@
 from pydantic import BaseModel
 
 class ChromaRequestModel(BaseModel):
-    query: str
-    context: str
+    currentFile: str
+    fileLength: int
+    distances: list[float]
+    closeFiles: list[str]
