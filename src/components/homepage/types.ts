@@ -10,6 +10,14 @@ export interface NodeData {
   };
 }
 
+export type InitializedNodeData = NodeData & {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+};
+
 export interface EdgeData {
   id: string;
   source: string;
