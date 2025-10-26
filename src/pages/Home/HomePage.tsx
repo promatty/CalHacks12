@@ -3,28 +3,32 @@ import { Graph3D, type GraphData } from "../../components/homepage";
 import { Canvas } from "@react-three/fiber";
 import { SpinningLogo } from "../Landing/SpinningLogo";
 
+const cacheKey = "home_graph_data_v1";
+
+// Helper to load cached data synchronously before first render
+function getInitialData(): GraphData | null {
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      return JSON.parse(cached) as GraphData;
+    }
+  } catch (e) {
+    console.warn("sessionStorage read failed", e);
+  }
+  return null;
+}
+
 function HomePage() {
-  const [mockGraphData, setMockGraphData] = useState<GraphData | null>(null);
-  const [progress, setProgress] = useState(0);
-  const dataLoadedRef = useRef(false);
+  const [mockGraphData, setMockGraphData] = useState<GraphData | null>(
+    getInitialData()
+  );
+  const [progress, setProgress] = useState(mockGraphData ? 100 : 0);
+  const dataLoadedRef = useRef(!!mockGraphData);
 
   useEffect(() => {
-    const cacheKey = "home_graph_data_v1";
-
-    // Try to read from sessionStorage first. If present, use it and skip network work.
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const graph = JSON.parse(cached) as GraphData;
-        dataLoadedRef.current = true;
-        setProgress(100);
-        // small timeout to ensure UI updates smoothly
-        setTimeout(() => setMockGraphData(graph), 50);
-        return;
-      }
-    } catch (e) {
-      // sessionStorage can throw in some environments; fall back to network fetch
-      console.warn("sessionStorage read failed", e);
+    // If data is already loaded from cache, skip the network fetch
+    if (dataLoadedRef.current) {
+      return;
     }
 
     const startTime = Date.now();
