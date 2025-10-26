@@ -18,17 +18,15 @@ export const generateRandomPosition = (
   return { x, y: adjustedY, z };
 };
 
+
 export const initializeNodePositions = (
   nodes: NodeData[]
 ): InitializedNodeData[] => {
   return nodes.map((node, index) => {
-    if (!node.position) {
-      return {
-        ...node,
-        position: generateRandomPosition(index, nodes.length),
-      };
-    }
-    return node;
+    return {
+      ...node,
+      position: generateRandomPosition(index, nodes.length),
+    };
   }) as InitializedNodeData[];
 };
 
@@ -65,9 +63,9 @@ export const applyForces = (
   }));
 
   const repulsionStrength = 5;
-  const attractionStrength = 0.05;
-  const damping = 0.9;
-  const centeringStrength = 0.01;
+  const attractionStrength = 0.01;
+  const damping = 0.1;
+  const centeringStrength = 0.001;
 
   for (let i = 0; i < updatedNodes.length; i++) {
     const nodeA = updatedNodes[i];
