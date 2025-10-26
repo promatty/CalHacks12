@@ -47,7 +47,7 @@ export function Hero() {
       <motion.h2 className="text-xl mb-10" variants={itemVariants}>
         Stop searching through Git history manually. Automatically sync commits
         to ChromaDB, visualize relationships, and query your codebase through a
-        custom MCP server
+        custom MCP server.
       </motion.h2>
       <motion.div
         className="flex flex-row items-center justify-center gap-4 max-w-3xl mx-auto"
