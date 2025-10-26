@@ -40,6 +40,8 @@ async def get_chroma_response(query_request: ChromaRequestModel, authorized: dic
 
     filenames = list({m["filename"] for m in results["metadatas"][0] if "filename" in m})
 
+    responses = []
+
     for filename in filenames:
         search_file = (Search()
                        .where(K("filename") == filename)
@@ -54,13 +56,14 @@ async def get_chroma_response(query_request: ChromaRequestModel, authorized: dic
 
         closests = collection.search(search.rank(Knn(query = embeddings)))
 
-        break
+        model = ChromaRequestModel(
+            currentFile=filename,
+            fileLength=file_len,
+            distances=closests['scores'][0][1:4],
+            closeFiles=[closests['metadatas'][0][i]['filename'] for i in range(1,4)]
+        )
+        responses.append(model)
 
-    return {
-        "currentFile": filename,
-        "fileLength": len(results['documents'][0][0]),
-        "distances": closests['scores'][0][1:4],
-        "closeFiles": [closests['metadatas'][0][i]['filename'] for i in range(1,4)]
-    }
+    return responses
 
 
