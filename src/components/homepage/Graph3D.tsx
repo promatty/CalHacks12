@@ -10,7 +10,6 @@ import {
   getConnectedNodeIds,
   getFileName,
   getHeatMapColor,
-  getNodeSize,
   initializeNodePositions,
 } from "./utils";
 
@@ -174,7 +173,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     const maxEdits = Math.max(...nodesRef.current.map((n) => n.editCount));
 
     nodesRef.current.forEach((node) => {
-      const geometry = new THREE.SphereGeometry(2, 64, 64);
+      const geometry = new THREE.SphereGeometry(1, 64, 64);
       const color = getHeatMapColor(node.editCount, maxEdits);
       const baseColor = new THREE.Color(color);
       const vertexShader = `
