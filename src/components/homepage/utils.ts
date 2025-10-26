@@ -1,39 +1,47 @@
-import type { EdgeData, InitializedNodeData, NodeData } from './types';
+import type { EdgeData, InitializedNodeData, NodeData } from "./types";
 
-export const generateRandomPosition = (index: number, total: number): { x: number; y: number; z: number } => {
+export const generateRandomPosition = (
+  index: number,
+  total: number
+): { x: number; y: number; z: number } => {
   const radius = 12;
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  
+
   const y = 1 - (index / (total - 1)) * 2;
   const radiusAtY = Math.sqrt(1 - y * y);
   const theta = goldenAngle * index;
-  
+
   const x = Math.cos(theta) * radiusAtY * radius;
   const z = Math.sin(theta) * radiusAtY * radius;
   const adjustedY = y * radius;
-  
+
   return { x, y: adjustedY, z };
 };
 
-export const initializeNodePositions = (nodes: NodeData[]): InitializedNodeData[] => {
+export const initializeNodePositions = (
+  nodes: NodeData[]
+): InitializedNodeData[] => {
   return nodes.map((node, index) => {
     if (!node.position) {
       return {
         ...node,
-        position: generateRandomPosition(index, nodes.length)
+        position: generateRandomPosition(index, nodes.length),
       };
     }
     return node;
   }) as InitializedNodeData[];
 };
 
-export const getHeatMapColor = (editCount: number, maxEdits: number): string => {
+export const getHeatMapColor = (
+  editCount: number,
+  maxEdits: number
+): string => {
   if (maxEdits <= 0) {
     // Return a default color if maxEdits is zero or negative
-    return 'rgb(200,200,200)';
+    return "rgb(200,200,200)";
   }
   const intensity = Math.min(editCount / maxEdits, 1);
-  
+
   if (intensity < 0.33) {
     const r = Math.floor(100 + intensity * 3 * 155);
     return `rgb(${r}, 200, 255)`;
@@ -46,10 +54,14 @@ export const getHeatMapColor = (editCount: number, maxEdits: number): string => 
   }
 };
 
-export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], deltaTime: number): InitializedNodeData[] => {
-  const updatedNodes = nodes.map(node => ({
+export const applyForces = (
+  nodes: InitializedNodeData[],
+  edges: EdgeData[],
+  deltaTime: number
+): InitializedNodeData[] => {
+  const updatedNodes = nodes.map((node) => ({
     ...node,
-    velocity: node.velocity || { x: 0, y: 0, z: 0 }
+    velocity: node.velocity || { x: 0, y: 0, z: 0 },
   }));
 
   const repulsionStrength = 5;
@@ -59,20 +71,20 @@ export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], del
 
   for (let i = 0; i < updatedNodes.length; i++) {
     const nodeA = updatedNodes[i];
-    
+
     for (let j = i + 1; j < updatedNodes.length; j++) {
       const nodeB = updatedNodes[j];
-      
+
       const dx = nodeB.position.x - nodeA.position.x;
       const dy = nodeB.position.y - nodeA.position.y;
       const dz = nodeB.position.z - nodeA.position.z;
       const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
-      
+
       const force = repulsionStrength / (distance * distance);
       const fx = (dx / distance) * force;
       const fy = (dy / distance) * force;
       const fz = (dz / distance) * force;
-      
+
       nodeA.velocity!.x -= fx * deltaTime;
       nodeA.velocity!.y -= fy * deltaTime;
       nodeA.velocity!.z -= fz * deltaTime;
@@ -82,21 +94,21 @@ export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], del
     }
   }
 
-  edges.forEach(edge => {
-    const sourceNode = updatedNodes.find(n => n.id === edge.source);
-    const targetNode = updatedNodes.find(n => n.id === edge.target);
-    
+  edges.forEach((edge) => {
+    const sourceNode = updatedNodes.find((n) => n.id === edge.source);
+    const targetNode = updatedNodes.find((n) => n.id === edge.target);
+
     if (sourceNode && targetNode) {
       const dx = targetNode.position.x - sourceNode.position.x;
       const dy = targetNode.position.y - sourceNode.position.y;
       const dz = targetNode.position.z - sourceNode.position.z;
       const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
-      
+
       const force = (distance - 3) * attractionStrength;
       const fx = (dx / distance) * force;
       const fy = (dy / distance) * force;
       const fz = (dz / distance) * force;
-      
+
       sourceNode.velocity!.x += fx * deltaTime;
       sourceNode.velocity!.y += fy * deltaTime;
       sourceNode.velocity!.z += fz * deltaTime;
@@ -106,15 +118,15 @@ export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], del
     }
   });
 
-  updatedNodes.forEach(node => {
+  updatedNodes.forEach((node) => {
     node.velocity!.x -= node.position.x * centeringStrength * deltaTime;
     node.velocity!.y -= node.position.y * centeringStrength * deltaTime;
     node.velocity!.z -= node.position.z * centeringStrength * deltaTime;
-    
+
     node.velocity!.x *= damping;
     node.velocity!.y *= damping;
     node.velocity!.z *= damping;
-    
+
     node.position.x += node.velocity!.x * deltaTime;
     node.position.y += node.velocity!.y * deltaTime;
     node.position.z += node.velocity!.z * deltaTime;
@@ -123,10 +135,13 @@ export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], del
   return updatedNodes;
 };
 
-export const getConnectedNodeIds = (nodeId: string, edges: EdgeData[]): Set<string> => {
+export const getConnectedNodeIds = (
+  nodeId: string,
+  edges: EdgeData[]
+): Set<string> => {
   const connected = new Set<string>();
-  
-  edges.forEach(edge => {
+
+  edges.forEach((edge) => {
     if (edge.source === nodeId) {
       connected.add(edge.target);
     }
@@ -134,8 +149,13 @@ export const getConnectedNodeIds = (nodeId: string, edges: EdgeData[]): Set<stri
       connected.add(edge.source);
     }
   });
-  
+
   return connected;
+};
+
+export const getFileName = (nodeId: string, nodes: NodeData[]): string => {
+  const fileName = nodes.find((node) => node.id === nodeId)?.name || "Unknown";
+  return fileName;
 };
 
 export const applyMouseInfluence = (
@@ -144,7 +164,7 @@ export const applyMouseInfluence = (
   influenceRadius: number = 1,
   influenceStrength: number = 0.01
 ): InitializedNodeData[] => {
-  return nodes.map(node => {
+  return nodes.map((node) => {
     const dx = node.position.x - mousePosition.x;
     const dy = node.position.y - mousePosition.y;
     const dz = node.position.z - mousePosition.z;
@@ -162,11 +182,10 @@ export const applyMouseInfluence = (
           x: node.position.x + offsetX,
           y: node.position.y + offsetY,
           z: node.position.z + offsetZ,
-        }
+        },
       };
     }
 
     return node;
   });
 };
-

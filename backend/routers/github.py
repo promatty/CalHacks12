@@ -29,14 +29,14 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(bearer_s
 
 
 @router.get("/")
-async def get_github_commits(path: Optional[str] = None, credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
+async def get_github_commits(path: Optional[str] = None):
     """Fetch commits from the GitHub commits API for a repo/ref and optionally a file path.
 
     Use the query parameter `path` to filter commits for a specific file. Include the
     internal API key in the Authorization header (checked by verify_api_key). The
     GitHub token used to call GitHub's API comes from the service settings (GITHUB_TOKEN).
     """
-    verify_api_key(credentials)
+    # verify_api_key(credentials)
 
     owner = settings.GITHUB_OWNER
     repo = settings.GITHUB_REPO

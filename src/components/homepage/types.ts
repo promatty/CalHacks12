@@ -1,3 +1,5 @@
+import type { Endpoints } from "@octokit/types";
+
 export interface NodeData {
   id: string;
   name: string;
@@ -28,3 +30,11 @@ export interface GraphData {
   nodes: NodeData[];
   edges: EdgeData[];
 }
+
+// github types
+export type GetCommitResponse =
+  Endpoints["GET /repos/{owner}/{repo}/commits"]["response"];
+
+// Single-commit/list item type for the commits list endpoint
+export type Commit =
+  Endpoints["GET /repos/{owner}/{repo}/commits"]["response"]["data"][0];
