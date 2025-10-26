@@ -2,7 +2,7 @@ export interface NodeData {
   id: string;
   name: string;
   editCount: number;
-  position: {
+  position?: {
     x: number;
     y: number;
     z: number;
@@ -13,6 +13,14 @@ export interface NodeData {
     z: number;
   };
 }
+
+export type InitializedNodeData = NodeData & {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+};
 
 export interface EdgeData {
   id: string;

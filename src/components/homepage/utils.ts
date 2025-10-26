@@ -1,4 +1,31 @@
-import type { EdgeData, NodeData } from './types';
+import type { EdgeData, InitializedNodeData, NodeData } from './types';
+
+export const generateRandomPosition = (index: number, total: number): { x: number; y: number; z: number } => {
+  const radius = 12;
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  
+  const y = 1 - (index / (total - 1)) * 2;
+  const radiusAtY = Math.sqrt(1 - y * y);
+  const theta = goldenAngle * index;
+  
+  const x = Math.cos(theta) * radiusAtY * radius;
+  const z = Math.sin(theta) * radiusAtY * radius;
+  const adjustedY = y * radius;
+  
+  return { x, y: adjustedY, z };
+};
+
+export const initializeNodePositions = (nodes: NodeData[]): InitializedNodeData[] => {
+  return nodes.map((node, index) => {
+    if (!node.position) {
+      return {
+        ...node,
+        position: generateRandomPosition(index, nodes.length)
+      };
+    }
+    return node;
+  }) as InitializedNodeData[];
+};
 
 export const getHeatMapColor = (editCount: number, maxEdits: number): string => {
   if (maxEdits <= 0) {
@@ -19,7 +46,7 @@ export const getHeatMapColor = (editCount: number, maxEdits: number): string => 
   }
 };
 
-export const applyForces = (nodes: NodeData[], edges: EdgeData[], deltaTime: number) => {
+export const applyForces = (nodes: InitializedNodeData[], edges: EdgeData[], deltaTime: number): InitializedNodeData[] => {
   const updatedNodes = nodes.map(node => ({
     ...node,
     velocity: node.velocity || { x: 0, y: 0, z: 0 }
@@ -112,11 +139,11 @@ export const getConnectedNodeIds = (nodeId: string, edges: EdgeData[]): Set<stri
 };
 
 export const applyMouseInfluence = (
-  nodes: NodeData[],
+  nodes: InitializedNodeData[],
   mousePosition: { x: number; y: number; z: number },
   influenceRadius: number = 1,
   influenceStrength: number = 0.01
-) => {
+): InitializedNodeData[] => {
   return nodes.map(node => {
     const dx = node.position.x - mousePosition.x;
     const dy = node.position.y - mousePosition.y;

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { EdgeData, NodeData } from './types';
-import { applyForces, getConnectedNodeIds, getHeatMapColor } from './utils';
+import type { EdgeData, InitializedNodeData, NodeData } from './types';
+import { applyForces, getConnectedNodeIds, getHeatMapColor, initializeNodePositions } from './utils';
 
 interface Graph3DProps {
   nodes: NodeData[];
@@ -10,12 +11,13 @@ interface Graph3DProps {
 }
 
 export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const nodesRef = useRef<NodeData[]>(initialNodes);
+  const nodesRef = useRef<InitializedNodeData[]>(initializeNodePositions(initialNodes));
   const nodeMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const edgeLinesRef = useRef<Map<string, THREE.Line>>(new Map());
   const nodeLabelsRef = useRef<Map<string, THREE.Sprite>>(new Map());
@@ -69,10 +71,6 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     controls.minDistance = 15;
     controls.maxDistance = 40;
     controls.enablePan = true;
-    controls.maxPolarAngle = Math.PI * 0.75;
-    controls.minPolarAngle = Math.PI * 0.1;
-    controls.maxAzimuthAngle = Math.PI * 0.5;
-    controls.minAzimuthAngle = -Math.PI * 0.5;
     controls.target.set(0, 0, 0);
     controls.enableZoom = true;
     controls.autoRotate = false;
@@ -335,7 +333,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         const targetNode = nodesRef.current.find(n => n.id === edge.target);
         
         if (line && sourceNode && targetNode) {
-          const calculateVisualPosition = (node: NodeData) => {
+          const calculateVisualPosition = (node: InitializedNodeData) => {
             const dx = node.position.x - mouse3DRef.current.x;
             const dy = node.position.y - mouse3DRef.current.y;
             const dz = node.position.z - mouse3DRef.current.z;
@@ -566,31 +564,53 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
         )}
       </div>
 
-      <div className="absolute top-6 left-6 bg-black/80 backdrop-blur-sm rounded-lg p-4 min-w-[200px]">
-        <h3 className="text-white text-sm font-semibold mb-3">Edit Activity</h3>
-        
-        <div className="relative h-6 rounded-full overflow-hidden mb-2">
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(to right, 
-                ${getHeatMapColor(minEdits, maxEdits)}, 
-                ${getHeatMapColor(Math.floor(maxEdits * 0.33), maxEdits)}, 
-                ${getHeatMapColor(Math.floor(maxEdits * 0.66), maxEdits)}, 
-                ${getHeatMapColor(maxEdits, maxEdits)})`
-            }}
-          />
-        </div>
-        
-        <div className="flex justify-between text-xs text-gray-300">
-          <span>{minEdits} edits</span>
-          <span>{maxEdits} edits</span>
-        </div>
-        
-        <div className="mt-3 pt-3 border-t border-gray-700">
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>Total Files:</span>
-            <span className="text-white font-semibold">{initialNodes.length}</span>
+      <div className="absolute top-6 left-6 flex flex-col gap-3">
+        <button
+          onClick={() => navigate('/')}
+          className="w-14 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 transition-all duration-200 group"
+          aria-label="Back to landing page"
+        >
+          <svg 
+            className="w-3.5 h-3.5 text-gray-400 group-hover:text-white transition-colors" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M10 19l-7-7m0 0l7-7m-7 7h18" 
+            />
+          </svg>
+        </button>
+
+        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 min-w-[200px]">
+          <h3 className="text-white text-sm font-semibold mb-3">Edit Activity</h3>
+          
+          <div className="relative h-6 rounded-full overflow-hidden mb-2">
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to right, 
+                  ${getHeatMapColor(minEdits, maxEdits)}, 
+                  ${getHeatMapColor(Math.floor(maxEdits * 0.33), maxEdits)}, 
+                  ${getHeatMapColor(Math.floor(maxEdits * 0.66), maxEdits)}, 
+                  ${getHeatMapColor(maxEdits, maxEdits)})`
+              }}
+            />
+          </div>
+          
+          <div className="flex justify-between text-xs text-gray-300">
+            <span>{minEdits} edits</span>
+            <span>{maxEdits} edits</span>
+          </div>
+          
+          <div className="mt-3 pt-3 border-t border-gray-700">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Total Files:</span>
+              <span className="text-white font-semibold">{initialNodes.length}</span>
+            </div>
           </div>
         </div>
       </div>
