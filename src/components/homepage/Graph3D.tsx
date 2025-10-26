@@ -326,7 +326,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
 
         const response = await fetch(
           // change eventually to the actual filename
-          `http://localhost:8000/api/github/?path=ui.py`,
+          `http://localhost:8000/api/github/?path=${fileName}`,
           {
             method: "GET",
             headers: {

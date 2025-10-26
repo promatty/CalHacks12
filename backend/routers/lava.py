@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import json
+from fastapi import APIRouter
 import httpx
 from models.lava import LavaQueryRequest
 from core.config import settings
@@ -8,8 +8,6 @@ router = APIRouter(
     prefix="/lava",
     tags=["lava"]
 )
-
-bearer_scheme = HTTPBearer()
 
 context = """
 You are a TypeScript data generator that converts Chroma query results into a JSON object representing a dependency graph.
@@ -26,63 +24,66 @@ Always respond with a JSON object of the exact format below:
 
 Rules:
 
-The root object must have two keys: "nodes" and "edges".
+1. The root object must have two keys: "nodes" and "edges".
 
-Each node represents a file.
+2. Each node represents a file.
+   - id: a unique string identifier (e.g. "1", "2", ...).
+   - name: the filename (e.g. "App.tsx").
+   - editCount: a random integer between 2 and 13.
+   - lengthOfFile: the provided "fileLength" value.
 
-id: a unique string identifier (e.g. "1", "2", ...).
+3. Each edge represents a relationship between files based on the "closeFiles" field.
+   - For each object in the input:
+       - Create an edge from the "currentFile" to every file listed in "closeFiles".
+       - The "source" should be the id of the "currentFile".
+       - The "target" should be the id of the close file.
+   - Each edge must have a unique id like "e1", "e2", "e3", etc.
 
-name: the filename (e.g. "App.tsx").
+4. If a file appears as a "closeFile" but does not have its own "currentFile" entry, still create a node for it using a random editCount (2–13) and a random lengthOfFile (between 20–250).
 
-editCount: a number representing any file metric. You can make this metric up though and make it between 2-13.
+5. The ids for nodes should be unique and consistent across edges.
+   - Example: if "calculator.py" is id "1", all edges involving "calculator.py" must reference source or target "1".
 
-lengthOfFile: a number representing the length of the file (e.g. in lines of code).
+6. Do not include any text, comments, or explanations — only valid JSON.
 
-Each edge represents a relationship between two files.
-
-source: the id of the originating file.
-
-target: the id of the connected file.
-
-id: a unique edge ID (e.g. "e1", "e2", etc.).
-
-Do not include any text, comments, or explanations — only valid JSON.
+7. One node should only have a max of 3 edges originating from it.
 
 The output must always follow this exact structure and field names.
 """
 
-
-def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
-    if not credentials or not credentials.scheme or not credentials.credentials:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
-    # Ensure scheme is Bearer
-    if credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Invalid authentication scheme")
-
-    if credentials.credentials != settings.LAVA_FORWARD_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-    return True
-
 @router.post("/")
-async def get_lava_response(query_request: LavaQueryRequest, credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
-    # Validate credentials (keeps validation logic centralized)
-    verify_api_key(credentials)
+async def get_lava_response(query_request: LavaQueryRequest):
     url = f"{settings.LAVA_BASE_URL}/forward?u=https://api.openai.com/v1/chat/completions"
 
     # must include context as system message if provided
-    messages = []
-    messages.append({"role": "system", "content": context})
-    messages.append({"role": "user", "content": query_request.query})
+    messages = [
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": context
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Here is the file info:\n{json.dumps(query_request.query, indent=2)}"
+                }
+            ]
+        }
+    ]
 
     request_body = {
         "model": "gpt-4o-mini",
         "messages": messages,
-        "response_format": { type: "json_object" },
+        "response_format": { "type": "json_object" },
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             url, 
             json=request_body, 
