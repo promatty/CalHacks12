@@ -46,7 +46,7 @@ export function Hero() {
       </motion.h1>
       <motion.h2 className="text-xl mb-10" variants={itemVariants}>
         Stop searching through Git history manually. Automatically sync commits
-        to ChromaDB, visualize relationships, and query your codebase through a
+        to Chroma, visualize relationships, and query your codebase through a
         custom MCP server
       </motion.h2>
       <motion.div
