@@ -11,6 +11,7 @@ import {
   initializeNodePositions,
 } from "./utils";
 import { Sidebar } from "./sidebar/Sidebar";
+import useEscape from "../../hooks/useEscape";
 
 interface Graph3DProps {
   nodes: NodeData[];
@@ -46,6 +47,10 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const xzPlaneRef = useRef<THREE.Object3D | null>(null);
   const xyPlaneRef = useRef<THREE.Object3D | null>(null);
   const yzPlaneRef = useRef<THREE.Object3D | null>(null);
+
+  useEscape(() => {
+    setSelectedNodeId(null);
+  }, true);
 
   useEffect(() => {
     if (!containerRef.current) return;

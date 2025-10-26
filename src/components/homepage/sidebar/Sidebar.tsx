@@ -1,6 +1,8 @@
 import React, { useRef } from "react";
 import type { Commit, InitializedNodeData } from "../types";
 import getRandomColorClass from "./colors";
+import HoverText from "./fadingtext";
+import { motion } from "framer-motion";
 
 interface SidebarProps {
   setSelectedNodeId: (id: string | null) => void;
@@ -70,16 +72,35 @@ export const Sidebar = ({
   const fileName =
     nodesRef.current.find((n) => n.id === selectedNodeId)?.name || "this file";
 
+  const moreContainer = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const moreItem = {
+    hidden: { y: 25, opacity: 0 },
+    show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } },
+  };
+
   return (
     <div className="absolute top-0 right-0 h-full w-[475px] bg-black/90 backdrop-blur-md border-l border-gray-800 flex flex-col">
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex-1">
           <h2 className="text-white font-semibold text-lg">
-            {nodesRef.current.find((n) => n.id === selectedNodeId)?.name}
+            <HoverText>
+              {nodesRef.current.find((n) => n.id === selectedNodeId)?.name}
+            </HoverText>
           </h2>
-          <p className="text-gray-400 text-sm">
-            {nodesRef.current.find((n) => n.id === selectedNodeId)?.editCount}{" "}
-            edits
+          <p className="text-gray-400 text-sm flex gap-1">
+            <HoverText>
+              {nodesRef.current.find((n) => n.id === selectedNodeId)?.editCount}{" "}
+              edits
+            </HoverText>
           </p>
         </div>
         <button
@@ -112,7 +133,19 @@ export const Sidebar = ({
             <h3 className="text-white font-semibold text-sm mb-3">
               Commit History
             </h3>
-            <div className="space-y-3">
+            <motion.div
+              className="h-[1px] bg-gray-300 opacity-20 mb-4"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 2.2, ease: [0, 0, 0.15, 1] }}
+              style={{ originX: 0 }}
+            />
+            <motion.div
+              variants={moreContainer}
+              initial="hidden"
+              animate="show"
+              className="space-y-3"
+            >
               {(commits.length ?? 0) === 0 ? (
                 <div className="text-gray-400 text-sm">No commits found.</div>
               ) : (
@@ -137,8 +170,9 @@ export const Sidebar = ({
                   const isSelected = sha && selectedCommits.includes(sha);
 
                   return (
-                    <div
+                    <motion.div
                       key={sha || message + String(Math.random())}
+                      variants={moreItem}
                       onClick={() => toggleCommitSelection(sha)}
                       className={`bg-gray-900/50 rounded-lg p-3 border cursor-pointer transition-all ${
                         isSelected
@@ -169,11 +203,11 @@ export const Sidebar = ({
                           </p>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })
               )}
-            </div>
+            </motion.div>
           </div>
         </div>
       )}
