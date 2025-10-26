@@ -40,6 +40,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const [showXYPlane, setShowXYPlane] = useState<boolean>(true);
   const [showYZPlane, setShowYZPlane] = useState<boolean>(true);
   const [showGridControls, setShowGridControls] = useState<boolean>(false);
+  const [is2DMode, setIs2DMode] = useState<boolean>(false);
   // selected node will have a loading state when clicked to fetch from API
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeIdLoading, setSelectedNodeIdLoading] =
@@ -48,6 +49,11 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const xzPlaneRef = useRef<THREE.Object3D | null>(null);
   const xyPlaneRef = useRef<THREE.Object3D | null>(null);
   const yzPlaneRef = useRef<THREE.Object3D | null>(null);
+  const nodeTargetPositionsRef = useRef<Map<string, { x: number; y: number; z: number }>>(new Map());
+  const axisLinesRef = useRef<THREE.Line[]>([]);
+  const originalPositionsRef = useRef<Map<string, { x: number; y: number; z: number }>>(new Map());
+  const cameraOriginalPosRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+  const isAnimatingRef = useRef<boolean>(false);
 
   useEscape(() => {
     setSelectedNodeId(null);
@@ -176,6 +182,11 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     };
 
     const maxEdits = Math.max(...nodesRef.current.map((n) => n.editCount));
+
+    console.log("=== Node fileLength values ===");
+    nodesRef.current.forEach((node) => {
+      console.log(`${node.name}: ${node.lengthOfFile} lines`);
+    });
 
     nodesRef.current.forEach((node) => {
       const geometry = new THREE.SphereGeometry(1, 64, 64);
@@ -324,6 +335,86 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       if (intersects.length > 0) {
         const clickedMesh = intersects[0].object as THREE.Mesh;
         const nodeId = clickedMesh.userData.nodeId;
+        
+        // Find the clicked node's position
+        const clickedNode = nodesRef.current.find(n => n.id === nodeId);
+        if (clickedNode && controlsRef.current && cameraRef.current) {
+          // Save current camera position before animating
+          if (!cameraOriginalPosRef.current) {
+            cameraOriginalPosRef.current = {
+              position: cameraRef.current.position.clone(),
+              target: controlsRef.current.target.clone()
+            };
+          }
+          
+          // Calculate target camera position (offset from node)
+          const offset = 8;
+          const targetCamPos = new THREE.Vector3(
+            clickedNode.position.x,
+            clickedNode.position.y + 2,
+            clickedNode.position.z + offset
+          );
+          const targetLookAt = new THREE.Vector3(
+            clickedNode.position.x,
+            clickedNode.position.y,
+            clickedNode.position.z
+          );
+          
+          // Smoothly animate camera to node, then stop after 1 second to allow free movement
+          isAnimatingRef.current = true;
+          const animationStartTime = Date.now();
+          const animationDuration = 1000;
+          
+          const animateCamera = () => {
+            if (!cameraRef.current || !controlsRef.current || !isAnimatingRef.current) return;
+            
+            const elapsed = Date.now() - animationStartTime;
+            
+            if (elapsed >= animationDuration) {
+              // Animation time is up - stop and allow free movement
+              isAnimatingRef.current = false;
+              return;
+            }
+            
+            const easing = 0.08;
+            
+            // Animate camera position
+            const dx = targetCamPos.x - cameraRef.current.position.x;
+            const dy = targetCamPos.y - cameraRef.current.position.y;
+            const dz = targetCamPos.z - cameraRef.current.position.z;
+            
+            const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            if (distance > 0.01) {
+              cameraRef.current.position.x += dx * easing;
+              cameraRef.current.position.y += dy * easing;
+              cameraRef.current.position.z += dz * easing;
+            } else {
+              // Reached target early - stop animation
+              cameraRef.current.position.set(targetCamPos.x, targetCamPos.y, targetCamPos.z);
+              isAnimatingRef.current = false;
+              return;
+            }
+            
+            // Animate camera target
+            const targetDx = targetLookAt.x - controlsRef.current.target.x;
+            const targetDy = targetLookAt.y - controlsRef.current.target.y;
+            const targetDz = targetLookAt.z - controlsRef.current.target.z;
+            
+            controlsRef.current.target.x += targetDx * easing;
+            controlsRef.current.target.y += targetDy * easing;
+            controlsRef.current.target.z += targetDz * easing;
+            
+            controlsRef.current.update();
+            
+            if (isAnimatingRef.current && distance > 0.01) {
+              requestAnimationFrame(animateCamera);
+            }
+          };
+          
+          requestAnimationFrame(animateCamera);
+        }
+        
         setSelectedNodeId(nodeId);
         setSelectedNodeIdLoading(true);
 
@@ -358,10 +449,36 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       const currentTime = Date.now();
       const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
       lastTime = currentTime;
-
+      
       controls.update();
 
-      nodesRef.current = applyForces(nodesRef.current, edges, deltaTime);
+      if (!is2DMode) {
+        nodesRef.current = applyForces(nodesRef.current, edges, deltaTime);
+      } else {
+        // Animate nodes smoothly to their 2D positions with slower, more visible animation
+        nodesRef.current.forEach((node) => {
+          const targetPos = nodeTargetPositionsRef.current.get(node.id);
+          if (targetPos) {
+            const easing = 0.025; // Much slower for very visible travel
+            
+            const dx = targetPos.x - node.position.x;
+            const dy = targetPos.y - node.position.y;
+            const dz = targetPos.z - node.position.z;
+            
+            const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            if (distance > 0.01) {
+              node.position.x += dx * easing;
+              node.position.y += dy * easing;
+              node.position.z += dz * easing;
+            } else {
+              node.position.x = targetPos.x;
+              node.position.y = targetPos.y;
+              node.position.z = targetPos.z;
+            }
+          }
+        });
+      }
 
       nodesRef.current.forEach((node) => {
         const mesh = nodeMeshesRef.current.get(node.id);
@@ -378,7 +495,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
           let visualY = node.position.y;
           let visualZ = node.position.z;
 
-          if (distance < influenceRadius && distance > 0.1) {
+          if (!is2DMode && distance < influenceRadius && distance > 0.1) {
             const influence =
               (1 - distance / influenceRadius) * influenceStrength;
             const offsetX = (dx / distance) * influence;
@@ -496,7 +613,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       renderer?.dispose();
       controls?.dispose();
     };
-  }, [edges, initialNodes]);
+  }, [edges, initialNodes, is2DMode]);
 
   useEffect(() => {
     if (xzPlaneRef.current) {
@@ -515,6 +632,297 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
       yzPlaneRef.current.visible = showYZPlane;
     }
   }, [showYZPlane]);
+
+  useEffect(() => {
+    if (is2DMode && sceneRef.current) {
+      // Save original positions before transforming
+      nodesRef.current.forEach(node => {
+        originalPositionsRef.current.set(node.id, { ...node.position });
+      });
+      
+      // Sort by file length (least to greatest)
+      const sortedNodes = [...nodesRef.current].sort((a, b) => a.lengthOfFile - b.lengthOfFile);
+      
+      const maxLength = Math.max(...sortedNodes.map(n => n.lengthOfFile));
+      const minLength = Math.min(...sortedNodes.map(n => n.lengthOfFile));
+      const lengthRange = maxLength - minLength || 1;
+      
+      const xSpacing = 3;
+      const maxX = (sortedNodes.length - 1) * xSpacing / 2;
+      const minX = -maxX;
+      const maxY = 10;
+      const minY = 0;
+      
+      sortedNodes.forEach((node, index) => {
+        const normalizedLength = (node.lengthOfFile - minLength) / lengthRange;
+        
+        const targetX = (index - sortedNodes.length / 2) * xSpacing;
+        const targetY = normalizedLength * 10;
+        const targetZ = 0;
+        
+        // Save original position if not already saved
+        if (!originalPositionsRef.current.has(node.id)) {
+          originalPositionsRef.current.set(node.id, { ...node.position });
+        }
+        
+        nodeTargetPositionsRef.current.set(node.id, { x: targetX, y: targetY, z: targetZ });
+      });
+      
+      setShowXYPlane(false);
+      setShowXZPlane(false);
+      setShowYZPlane(false);
+      
+      // Hide edges in 2D mode
+      edgeLinesRef.current.forEach((line) => {
+        line.visible = false;
+      });
+      
+      // Clear existing axis lines and labels
+      axisLinesRef.current.forEach(obj => {
+        sceneRef.current?.remove(obj);
+        if (obj instanceof THREE.Line) {
+          obj.geometry.dispose();
+          (obj.material as THREE.LineBasicMaterial).dispose();
+        }
+      });
+      axisLinesRef.current = [];
+      
+      // Create axis lines and grid
+      const axisMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.3 });
+      
+      // Create grid lines
+      for (let i = 0; i <= sortedNodes.length; i++) {
+        const x = minX - 2 + (i * xSpacing);
+        const gridGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, minY - 1, 0),
+          new THREE.Vector3(x, maxY + 1, 0)
+        ]);
+        const gridLine = new THREE.Line(gridGeometry, gridMaterial);
+        sceneRef.current.add(gridLine);
+        axisLinesRef.current.push(gridLine);
+      }
+      
+      for (let i = 0; i <= 10; i++) {
+        const y = i;
+        const gridGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(minX - 2, y, 0),
+          new THREE.Vector3(maxX + 2, y, 0)
+        ]);
+        const gridLine = new THREE.Line(gridGeometry, gridMaterial);
+        sceneRef.current.add(gridLine);
+        axisLinesRef.current.push(gridLine);
+      }
+      
+      // X-axis (horizontal)
+      const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(minX - 2, minY - 1, 0),
+        new THREE.Vector3(maxX + 2, minY - 1, 0)
+      ]);
+      const xAxisLine = new THREE.Line(xAxisGeometry, axisMaterial);
+      sceneRef.current.add(xAxisLine);
+      axisLinesRef.current.push(xAxisLine);
+      
+      // Y-axis (vertical)
+      const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(minX - 2, minY - 1, 0),
+        new THREE.Vector3(minX - 2, maxY + 1, 0)
+      ]);
+      const yAxisLine = new THREE.Line(yAxisGeometry, axisMaterial);
+      sceneRef.current.add(yAxisLine);
+      axisLinesRef.current.push(yAxisLine);
+      
+      // Add axis labels using sprites (3D and bigger)
+      const createTextSprite = (text: string) => {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        if (!context) return null;
+
+        canvas.width = 512;
+        canvas.height = 128;
+
+        context.fillStyle = "rgba(0, 0, 0, 0.7)";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        
+        context.fillStyle = "white";
+        context.font = "bold 48px Arial";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+        });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(4, 1, 1);
+        return sprite;
+      };
+      
+      // X-axis label
+      const xLabel = createTextSprite("File Name");
+      if (xLabel) {
+        xLabel.position.set((minX + maxX) / 2, minY - 2.5, 0);
+        sceneRef.current.add(xLabel);
+        axisLinesRef.current.push(xLabel as unknown as THREE.Line);
+      }
+      
+      // Y-axis label
+      const yLabel = createTextSprite("File Length");
+      if (yLabel) {
+        yLabel.position.set(minX - 4, (minY + maxY) / 2, 0);
+        yLabel.rotation.z = Math.PI / 2;
+        sceneRef.current.add(yLabel);
+        axisLinesRef.current.push(yLabel as unknown as THREE.Line);
+      }
+      
+      if (controlsRef.current && cameraRef.current) {
+        const centerX = 0;
+        const centerY = maxY / 2;
+        const cameraOffsetX = 0;
+        
+        // Smoothly animate camera to 2D view position
+        const targetPos = new THREE.Vector3(centerX + cameraOffsetX, centerY, 20);
+        const targetLookAt = new THREE.Vector3(centerX + cameraOffsetX, centerY, 0);
+        
+        // Use one-time animation to 2D view position
+        isAnimatingRef.current = true;
+        const animateCamera = () => {
+          if (!cameraRef.current || !controlsRef.current || !isAnimatingRef.current) return;
+          
+          const easing = 0.03; // Smooth but visible transition
+          
+          // Animate camera position from wherever it currently is
+          const dx = targetPos.x - cameraRef.current.position.x;
+          const dy = targetPos.y - cameraRef.current.position.y;
+          const dz = targetPos.z - cameraRef.current.position.z;
+          
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          
+          if (distance > 0.01) {
+            cameraRef.current.position.x += dx * easing;
+            cameraRef.current.position.y += dy * easing;
+            cameraRef.current.position.z += dz * easing;
+          } else {
+            cameraRef.current.position.set(targetPos.x, targetPos.y, targetPos.z);
+            isAnimatingRef.current = false;
+            return;
+          }
+          
+          // Animate camera target
+          const targetDx = targetLookAt.x - controlsRef.current.target.x;
+          const targetDy = targetLookAt.y - controlsRef.current.target.y;
+          const targetDz = targetLookAt.z - controlsRef.current.target.z;
+          
+          controlsRef.current.target.x += targetDx * easing;
+          controlsRef.current.target.y += targetDy * easing;
+          controlsRef.current.target.z += targetDz * easing;
+          
+          controlsRef.current.update();
+          
+          if (isAnimatingRef.current && distance > 0.01) {
+            requestAnimationFrame(animateCamera);
+          }
+        };
+        
+        requestAnimationFrame(animateCamera);
+        
+        console.log(`Camera animating to: (${targetPos.x.toFixed(2)}, ${targetPos.y.toFixed(2)}, ${targetPos.z.toFixed(2)})`);
+      }
+    } else {
+      // Don't animate camera - let user move freely
+      // Just restore original node positions
+      // Restore original positions
+      nodesRef.current.forEach(node => {
+        const originalPos = originalPositionsRef.current.get(node.id);
+        if (originalPos) {
+          node.position.x = originalPos.x;
+          node.position.y = originalPos.y;
+          node.position.z = originalPos.z;
+        }
+      });
+      
+      // Show edges again
+      edgeLinesRef.current.forEach((line) => {
+        line.visible = true;
+      });
+      
+      // Clean up axis lines
+      if (sceneRef.current) {
+        axisLinesRef.current.forEach(obj => {
+          sceneRef.current?.remove(obj);
+          if (obj instanceof THREE.Line) {
+            obj.geometry.dispose();
+            (obj.material as THREE.LineBasicMaterial).dispose();
+          }
+        });
+        axisLinesRef.current = [];
+      }
+      
+      nodeTargetPositionsRef.current.clear();
+      setShowXYPlane(true);
+      setShowXZPlane(true);
+      setShowYZPlane(true);
+    }
+  }, [is2DMode, initialNodes]);
+
+  // Handle camera return when node is deselected
+  useEffect(() => {
+    if (!selectedNodeId && controlsRef.current && cameraRef.current) {
+      // Always ensure animation is stopped when no node is selected
+      isAnimatingRef.current = false;
+      
+      if (cameraOriginalPosRef.current) {
+        const originalPos = cameraOriginalPosRef.current;
+        
+        // Smoothly animate camera back to original position
+        isAnimatingRef.current = true;
+        const animateCamera = () => {
+          if (!cameraRef.current || !controlsRef.current || !isAnimatingRef.current) return;
+          
+          const easing = 0.08;
+          
+          // Animate camera position back
+          const dx = originalPos.position.x - cameraRef.current.position.x;
+          const dy = originalPos.position.y - cameraRef.current.position.y;
+          const dz = originalPos.position.z - cameraRef.current.position.z;
+          
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          
+          if (distance > 0.01) {
+            cameraRef.current.position.x += dx * easing;
+            cameraRef.current.position.y += dy * easing;
+            cameraRef.current.position.z += dz * easing;
+          } else {
+            // Animation complete - stop and clear
+            cameraRef.current.position.set(originalPos.position.x, originalPos.position.y, originalPos.position.z);
+            controlsRef.current.target.set(originalPos.target.x, originalPos.target.y, originalPos.target.z);
+            isAnimatingRef.current = false;
+            cameraOriginalPosRef.current = null;
+            return;
+          }
+          
+          // Animate camera target back
+          const targetDx = originalPos.target.x - controlsRef.current.target.x;
+          const targetDy = originalPos.target.y - controlsRef.current.target.y;
+          const targetDz = originalPos.target.z - controlsRef.current.target.z;
+          
+          controlsRef.current.target.x += targetDx * easing;
+          controlsRef.current.target.y += targetDy * easing;
+          controlsRef.current.target.z += targetDz * easing;
+          
+          controlsRef.current.update();
+          
+          if (isAnimatingRef.current && distance > 0.01) {
+            requestAnimationFrame(animateCamera);
+          }
+        };
+        
+        requestAnimationFrame(animateCamera);
+      }
+    }
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (!hoveredNodeId) {
@@ -636,6 +1044,24 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
           </svg>
         </button>
 
+        <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-gray-700">
+          <span className="text-gray-300">2D View</span>
+          <button
+            onClick={() => setIs2DMode(!is2DMode)}
+            className={`w-11 h-6 rounded-full relative ${
+              is2DMode ? "bg-blue-600" : "bg-gray-600"
+            }`}
+          >
+            <motion.div
+              className="absolute top-px left-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+              animate={{
+                x: is2DMode ? 21 : -3,
+              }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            />
+          </button>
+        </div>
+
         <AnimatePresence>
           {showGridControls && (
             <motion.div
@@ -650,7 +1076,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
                 <button
                   onClick={() => setShowXZPlane(!showXZPlane)}
                   className={`w-11 h-6 rounded-full relative  ${
-                    showXZPlane ? "bg-green-600!" : "!bg-red-600!"
+                    showXZPlane ? "bg-green-600!" : "bg-red-600!"
                   }`}
                 >
                   <motion.div
