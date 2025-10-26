@@ -1,8 +1,9 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { EdgeData, InitializedNodeData, NodeData } from "./types";
+import type { Commit, EdgeData, InitializedNodeData, NodeData } from "./types";
 import {
   applyForces,
   getConnectedNodeIds,
@@ -43,7 +44,7 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeIdLoading, setSelectedNodeIdLoading] =
     useState<boolean>(false);
-  const [commitData, setCommitData] = useState<any>(null);
+  const [commitData, setCommitData] = useState<Commit[]>([]);
   const xzPlaneRef = useRef<THREE.Object3D | null>(null);
   const xyPlaneRef = useRef<THREE.Object3D | null>(null);
   const yzPlaneRef = useRef<THREE.Object3D | null>(null);
@@ -177,10 +178,9 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
     const maxEdits = Math.max(...nodesRef.current.map((n) => n.editCount));
 
     nodesRef.current.forEach((node) => {
-      const geometry = new THREE.SphereGeometry(0.6, 64, 64);
+      const geometry = new THREE.SphereGeometry(1, 64, 64);
       const color = getHeatMapColor(node.editCount, maxEdits);
       const baseColor = new THREE.Color(color);
-
       const vertexShader = `
         varying vec3 vNormal;
         varying vec3 vPosition;
@@ -636,57 +636,71 @@ export default function Graph3D({ nodes: initialNodes, edges }: Graph3DProps) {
           </svg>
         </button>
 
-        {showGridControls && (
-          <div className="mt-3 space-y-2 border-t border-gray-700 pt-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300">XZ Plane</span>
-              <button
-                onClick={() => setShowXZPlane(!showXZPlane)}
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  showXZPlane ? "bg-blue-600" : "bg-gray-600"
-                } relative`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                    showXZPlane ? "right-0.5" : "left-0.5"
+        <AnimatePresence>
+          {showGridControls && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 space-y-2 border-t  pt-3 overflow-hidden"
+            >
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-300">XZ Plane</span>
+                <button
+                  onClick={() => setShowXZPlane(!showXZPlane)}
+                  className={`w-11 h-6 rounded-full relative  ${
+                    showXZPlane ? "bg-green-600!" : "!bg-red-600!"
                   }`}
-                />
-              </button>
-            </div>
+                >
+                  <motion.div
+                    className="absolute top-px left-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+                    animate={{
+                      x: showXZPlane ? 21 : -3,
+                    }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300">XY Plane</span>
-              <button
-                onClick={() => setShowXYPlane(!showXYPlane)}
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  showXYPlane ? "bg-purple-600" : "bg-gray-600"
-                } relative`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                    showXYPlane ? "right-0.5" : "left-0.5"
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-300">XY Plane</span>
+                <button
+                  onClick={() => setShowXYPlane(!showXYPlane)}
+                  className={`w-11 h-6 rounded-full relative ${
+                    showXYPlane ? "bg-green-600!" : "bg-red-600!"
                   }`}
-                />
-              </button>
-            </div>
+                >
+                  <motion.div
+                    className="absolute top-px left-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+                    animate={{
+                      x: showXYPlane ? 21 : -3,
+                    }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-300">YZ Plane</span>
-              <button
-                onClick={() => setShowYZPlane(!showYZPlane)}
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  showYZPlane ? "bg-green-600" : "bg-gray-600"
-                } relative`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                    showYZPlane ? "right-0.5" : "left-0.5"
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-300">YZ Plane</span>
+                <button
+                  onClick={() => setShowYZPlane(!showYZPlane)}
+                  className={`w-11 h-6 rounded-full relative ${
+                    showYZPlane ? "bg-green-600!" : "bg-red-600!"
                   }`}
-                />
-              </button>
-            </div>
-          </div>
-        )}
+                >
+                  <motion.div
+                    className="absolute top-px left-0.5 w-5 h-5 rounded-full bg-white shadow-md"
+                    animate={{
+                      x: showYZPlane ? 21 : -3,
+                    }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="absolute top-6 left-6 flex flex-col gap-3">
