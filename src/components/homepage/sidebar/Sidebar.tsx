@@ -77,7 +77,7 @@ export const Sidebar = ({
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1,
+        staggerChildren: 0.3,
       },
     },
   };
@@ -137,7 +137,7 @@ export const Sidebar = ({
               className="h-[1px] bg-gray-300 opacity-20 mb-4"
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
-              transition={{ duration: 2.2, ease: [0, 0, 0.15, 1] }}
+              transition={{ duration: 1.8, ease: "easeIn" }}
               style={{ originX: 0 }}
             />
             <motion.div

@@ -9,6 +9,24 @@ function HomePage() {
   const dataLoadedRef = useRef(false);
 
   useEffect(() => {
+    const cacheKey = "home_graph_data_v1";
+
+    // Try to read from sessionStorage first. If present, use it and skip network work.
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const graph = JSON.parse(cached) as GraphData;
+        dataLoadedRef.current = true;
+        setProgress(100);
+        // small timeout to ensure UI updates smoothly
+        setTimeout(() => setMockGraphData(graph), 50);
+        return;
+      }
+    } catch (e) {
+      // sessionStorage can throw in some environments; fall back to network fetch
+      console.warn("sessionStorage read failed", e);
+    }
+
     const startTime = Date.now();
     const duration = 25000; // ~25 seconds in milliseconds
 
@@ -21,55 +39,64 @@ function HomePage() {
     }, 100); // update every 100ms
 
     (async () => {
-      const chromaResponse = await fetch(
-        // change eventually to the actual filename
-        `http://localhost:8000/api/chroma/all`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      try {
+        const chromaResponse = await fetch(
+          // change eventually to the actual filename
+          `http://localhost:8000/api/chroma/all`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!chromaResponse.ok) {
+          throw new Error("Failed to fetch chroma data");
         }
-      );
 
-      if (!chromaResponse.ok) {
-        console.error("Failed to fetch chroma data");
-        clearInterval(progressInterval);
-        return;
-      }
+        const chromaData = await chromaResponse.json();
 
-      const chromaData = await chromaResponse.json();
+        const lavaResponse = await fetch(
+          // change eventually to the actual filename
+          `http://localhost:8000/api/lava`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ query: chromaData }),
+          }
+        );
 
-      const lavaResponse = await fetch(
-        // change eventually to the actual filename
-        `http://localhost:8000/api/lava`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ query: chromaData }),
+        if (!lavaResponse.ok) {
+          throw new Error("Failed to fetch lava data");
         }
-      );
-      if (!lavaResponse.ok) {
-        console.error("Failed to fetch lava data");
+
+        const graphDataResponse = await lavaResponse.json();
+        const graphData = JSON.parse(
+          graphDataResponse.response.choices[0].message.content
+        );
+
+        // cache result in sessionStorage so reloads don't re-run the heavy query
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(graphData));
+        } catch (e) {
+          console.warn("sessionStorage write failed", e);
+        }
+
+        dataLoadedRef.current = true;
         clearInterval(progressInterval);
-        return;
+        setProgress(100);
+
+        // small delay to show 100% before displaying the graph
+        setTimeout(() => {
+          setMockGraphData(graphData);
+        }, 100);
+      } catch (err) {
+        console.error(err);
+        clearInterval(progressInterval);
       }
-
-      const graphDataResponse = await lavaResponse.json();
-      const graphData = JSON.parse(
-        graphDataResponse.response.choices[0].message.content
-      );
-
-      dataLoadedRef.current = true;
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      // small delay to show 100% before displaying the graph
-      setTimeout(() => {
-        setMockGraphData(graphData);
-      }, 100);
     })();
 
     return () => {
