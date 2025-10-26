@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import chroma, lava
+from routers import chroma, lava, github
 from core.config import settings
 
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
 # uncomment when we eventually edit this routergg
 app.include_router(chroma.router, prefix=settings.API_PREFIX)
 app.include_router(lava.router, prefix=settings.API_PREFIX)
+app.include_router(github.router, prefix=settings.API_PREFIX)
 
 if __name__ == "__main__":
     import uvicorn

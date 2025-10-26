@@ -2,11 +2,7 @@ export interface NodeData {
   id: string;
   name: string;
   editCount: number;
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  fileLength: number;
   velocity?: {
     x: number;
     y: number;
@@ -24,4 +20,3 @@ export interface GraphData {
   nodes: NodeData[];
   edges: EdgeData[];
 }
-

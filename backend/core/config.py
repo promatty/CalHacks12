@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     TENANT: str = ""
     DATABASE_NAME: str = ""
 
+    # github api token
+    GITHUB_TOKEN: str = ""
+    GITHUB_OWNER: str = "promatty"
+    GITHUB_REPO: str = "example-calculator"
+
     @field_validator("ALLOWED_ORIGINS")
     @classmethod
     def parse(cls, v: Any) -> List[str]:
