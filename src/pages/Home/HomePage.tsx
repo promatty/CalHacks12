@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Graph3D, type GraphData } from "../../components/homepage";
 import { Canvas } from "@react-three/fiber";
 import { SpinningLogo } from "../Landing/SpinningLogo";
@@ -6,6 +6,7 @@ import { SpinningLogo } from "../Landing/SpinningLogo";
 function HomePage() {
   const [mockGraphData, setMockGraphData] = useState<GraphData | null>(null);
   const [progress, setProgress] = useState(0);
+  const dataLoadedRef = useRef(false);
 
   useEffect(() => {
     const startTime = Date.now();
@@ -13,8 +14,10 @@ function HomePage() {
 
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const currentProgress = Math.min((elapsed / duration) * 100, 100);
-      setProgress(Math.floor(currentProgress));
+      const currentProgress = Math.min((elapsed / duration) * 100, 99); // cap at 99% until loaded
+      if (!dataLoadedRef.current) {
+        setProgress(Math.floor(currentProgress));
+      }
     }, 100); // update every 100ms
 
     (async () => {
@@ -59,9 +62,14 @@ function HomePage() {
         graphDataResponse.response.choices[0].message.content
       );
 
+      dataLoadedRef.current = true;
       clearInterval(progressInterval);
       setProgress(100);
-      setMockGraphData(graphData);
+
+      // small delay to show 100% before displaying the graph
+      setTimeout(() => {
+        setMockGraphData(graphData);
+      }, 100);
     })();
 
     return () => {
@@ -85,7 +93,7 @@ function HomePage() {
             <SpinningLogo />
           </Canvas>
           <div className="absolute bottom-1/4 text-6xl font-bold text-white">
-            {progress}%
+            Thinking... {progress}%
           </div>
         </div>
       )}
